@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"log"
 	"os"
-  "io"
 
 	"github.com/quic-go/quic-go"
 )
@@ -64,12 +64,12 @@ func client(fname string) error {
 	if err != nil {
 		return err
 	}
-  _, err = io.ReadFull(stream, buff)
-  if err != nil {
-    return err
-  }
+	_, err = io.ReadFull(stream, buff)
+	if err != nil {
+		return err
+	}
 
-  fmt.Println("DONE")
+	fmt.Println("DONE")
 
 	return nil
 }

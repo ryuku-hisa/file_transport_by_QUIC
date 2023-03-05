@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"log"
 	"math/big"
 
@@ -33,26 +32,24 @@ func server() error {
 	if err != nil {
 		return err
 	}
-	conn, err := listener.Accept(context.Background())
-	if err != nil {
-		return err
+	for {
+		conn, err := listener.Accept(context.Background())
+		if err != nil {
+			return err
+		}
+		stream, err := conn.AcceptStream(context.Background())
+		if err != nil {
+			panic(err)
+		}
+
+		// Echo through the loggingWriter
+		buff := make([]byte, 1024)
+		stream.Read(buff)
+		fmt.Println(string(buff))
+		stream.Close()
+
 	}
-	stream, err := conn.AcceptStream(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-  // Echo through the loggingWriter
-  _, err = io.Copy(loggingWriter{stream}, stream)
-	return err
-}
-
-// A wrapper for io.Writer that also logs the message.
-type loggingWriter struct{ io.Writer }
-
-func (w loggingWriter) Write(b []byte) (int, error) {
-	fmt.Printf("received data: \n%s\n", string(b))
-  return w.Writer.Write(b)
+	return nil
 }
 
 // Setup a bare-bones TLS config for the server
