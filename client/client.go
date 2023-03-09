@@ -4,17 +4,14 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"log"
 	"os"
 
 	"github.com/quic-go/quic-go"
 )
 
-const addr = "localhost:4242"
+const addr = "localhost:50051"
 
-// We start a server echoing data on the first stream the client opens,
-// then connect with a client, send the message, and wait for its receipt.
 func main() {
 	if len(os.Args) != 2 {
 		log.Fatal("invalid argument")
@@ -33,43 +30,35 @@ func client(fname string) error {
 	}
 	defer fp.Close()
 
+	tlsConf := &tls.Config{
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"quic-file-stream"},
+	}
+
+	conn, err := quic.DialAddr(addr, tlsConf, nil)
+
+	stream, err := conn.OpenStreamSync(context.Background())
+	defer stream.Close()
+
 	buff := make([]byte, 1024)
 
 	for {
+
 		n, err := fp.Read(buff)
 		if n == 0 {
+			fmt.Println("fin reading")
 			break
 		}
 		if err != nil {
-			panic(err)
+			return err
+		}
+
+		_, err = stream.Write(buff[:n])
+		if err != nil {
+			return err
 		}
 	}
-
-	tlsConf := &tls.Config{
-		InsecureSkipVerify: true,
-		NextProtos:         []string{"quic-echo-example"},
-	}
-	conn, err := quic.DialAddr(addr, tlsConf, nil)
-	if err != nil {
-		return err
-	}
-
-	stream, err := conn.OpenStreamSync(context.Background())
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("Sending data...")
-	_, err = stream.Write(buff)
-	if err != nil {
-		return err
-	}
-	_, err = io.ReadFull(stream, buff)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("DONE")
+	log.Println("DONE")
 
 	return nil
 }

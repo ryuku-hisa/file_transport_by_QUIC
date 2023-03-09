@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -8,16 +9,18 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
+	"os"
 
 	"github.com/quic-go/quic-go"
 )
 
-const addr = "localhost:4242"
+const addr = "localhost:50051"
+const buffSize = 1024
+const fname = "./download/data.MOV"
 
-// We start a server echoing data on the first stream the client opens,
-// then connect with a client, send the message, and wait for its receipt.
 func main() {
 	fmt.Println("start server...")
 	err := server()
@@ -26,35 +29,57 @@ func main() {
 	}
 }
 
-// Start a server that echos all data on the first stream opened by the client
 func server() error {
 	listener, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
 	if err != nil {
 		return err
 	}
+
+	fp, err := os.Create(fname)
+	if err != nil {
+		return err
+	}
+	defer fp.Close()
+
+	bw := bufio.NewWriter(fp)
+
+	conn, err := listener.Accept(context.Background())
+	if err != nil {
+		return err
+	}
+
+	stream, err := conn.AcceptStream(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	defer stream.Close()
+
+	buff := make([]byte, buffSize)
+
 	for {
-		conn, err := listener.Accept(context.Background())
+		n, err := stream.Read(buff)
+		if err == io.EOF || n == 0 {
+			break
+		}
 		if err != nil {
 			return err
 		}
-		stream, err := conn.AcceptStream(context.Background())
-		if err != nil {
-			panic(err)
+
+		if _, err := bw.Write(buff[:n]); err != nil {
+			return err
 		}
-
-		// Echo through the loggingWriter
-		buff := make([]byte, 1024)
-		stream.Read(buff)
-		fmt.Println(string(buff))
-		stream.Close()
-
 	}
+
+	if err = bw.Flush(); err != nil {
+		return err
+	}
+	log.Println("DONE")
 	return nil
 }
 
 // Setup a bare-bones TLS config for the server
 func generateTLSConfig() *tls.Config {
-	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	key, err := rsa.GenerateKey(rand.Reader, buffSize)
 	if err != nil {
 		panic(err)
 	}
@@ -72,6 +97,6 @@ func generateTLSConfig() *tls.Config {
 	}
 	return &tls.Config{
 		Certificates: []tls.Certificate{tlsCert},
-		NextProtos:   []string{"quic-echo-example"},
+		NextProtos:   []string{"quic-file-stream"},
 	}
 }
