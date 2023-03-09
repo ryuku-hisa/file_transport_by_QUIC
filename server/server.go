@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"os"
@@ -16,12 +17,10 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
-const addr = "localhost:4242"
+const addr = "localhost:50051"
 const buffSize = 1024
-const fname = "./download/data.txt"
+const fname = "./download/data.MOV"
 
-// We start a server echoing data on the first stream the client opens,
-// then connect with a client, send the message, and wait for its receipt.
 func main() {
 	fmt.Println("start server...")
 	err := server()
@@ -30,7 +29,6 @@ func main() {
 	}
 }
 
-// Start a server that echos all data on the first stream opened by the client
 func server() error {
 	listener, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
 	if err != nil {
@@ -45,52 +43,37 @@ func server() error {
 
 	bw := bufio.NewWriter(fp)
 
+	conn, err := listener.Accept(context.Background())
+	if err != nil {
+		return err
+	}
+
+	stream, err := conn.AcceptStream(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	defer stream.Close()
+
+	buff := make([]byte, buffSize)
+
 	for {
-		fmt.Println("listener accept")
-		conn, err := listener.Accept(context.Background())
-		if err != nil {
-			return err
-		}
-		fmt.Printf("done\n\n")
-
-		fmt.Println("accept stream")
-		stream, err := conn.AcceptStream(context.Background())
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("done\n\n")
-
-		buff := make([]byte, buffSize)
-
-		fmt.Println("stream read")
 		n, err := stream.Read(buff)
-		fmt.Printf("n is %d\n", n)
-		if n == 0 {
-			fmt.Println("fin reading")
-			stream.Close()
+		if err == io.EOF || n == 0 {
 			break
 		}
 		if err != nil {
 			return err
 		}
-		fmt.Printf("done\n\n")
 
-		fmt.Println("write to bufio writer")
-		fmt.Println("buff: " + string(buff[:n]))
 		if _, err := bw.Write(buff[:n]); err != nil {
 			return err
 		}
-		fmt.Printf("done\n\n")
-		stream.Close()
 	}
 
-	fmt.Println("flush to file")
 	if err = bw.Flush(); err != nil {
 		return err
 	}
-	fmt.Printf("done\n\n")
-
-	fmt.Printf("== DONE server() ==\n\n")
+	log.Println("DONE")
 	return nil
 }
 
