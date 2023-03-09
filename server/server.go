@@ -19,7 +19,7 @@ import (
 
 const addr = "localhost:50051"
 const buffSize = 1024
-const fname = "./download/data.MOV"
+const fname = "./download/data.txt"
 
 func main() {
 	fmt.Println("start server...")
