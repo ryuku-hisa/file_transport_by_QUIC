@@ -33,42 +33,53 @@ func client(fname string) error {
 	}
 	defer fp.Close()
 
-	buff := make([]byte, 1024)
+	tlsConf := &tls.Config{
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"quic-file-stream"},
+	}
 
+	fmt.Println("dial address")
+	conn, err := quic.DialAddr(addr, tlsConf, nil)
+
+	stream, err := conn.OpenStream()
 	for {
+		fmt.Println("read data from the file")
+		buff := make([]byte, 1024)
 		n, err := fp.Read(buff)
-		if n == 0 {
-			break
-		}
+		fmt.Printf("n is %d\n", n)
+		// if n == 0 {
+		// 	fmt.Println("fin reading")
+		// 	break
+		// }
 		if err != nil {
 			panic(err)
 		}
+		fmt.Printf("done\n\n")
+
+		fmt.Println("stream write")
+		_, err = stream.Write(buff[:n])
+		if err != nil {
+			return err
+		}
+		fmt.Printf("done\n\n")
+
+		fmt.Println("send data")
+		_, err = io.ReadFull(stream, buff[:n])
+		if err == io.EOF {
+			fmt.Println("fin reading")
+			break
+		}
+		if err != nil {
+			return err
+		}
+		fmt.Printf("done\n\n")
+
+		fmt.Println("accept stream")
+		conn.AcceptStream(context.Background())
+		fmt.Printf("done\n\n")
 	}
 
-	tlsConf := &tls.Config{
-		InsecureSkipVerify: true,
-		NextProtos:         []string{"quic-echo-example"},
-	}
-	conn, err := quic.DialAddr(addr, tlsConf, nil)
-	if err != nil {
-		return err
-	}
-
-	stream, err := conn.OpenStreamSync(context.Background())
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("Sending data...")
-	_, err = stream.Write(buff)
-	if err != nil {
-		return err
-	}
-	_, err = io.ReadFull(stream, buff)
-	if err != nil {
-		return err
-	}
-
+	stream.Close()
 	fmt.Println("DONE")
 
 	return nil
