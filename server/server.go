@@ -17,9 +17,9 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
-const addr = "localhost:50051"
+const addr = "192.168.15.35:50051"
 const buffSize = 1024
-const fname = "./download/data.MOV"
+const fname = "./download/data.txt"
 
 func main() {
 	fmt.Println("start server...")
@@ -48,38 +48,38 @@ func server() error {
 		return err
 	}
 
-	stream, err := conn.AcceptStream(context.Background())
+	stream, err := conn.AcceptUniStream(context.Background())
 	if err != nil {
-		panic(err)
+		return err
 	}
-	defer stream.Close()
+	//defer stream.Close()
 
 	buff := make([]byte, buffSize)
 
 	for {
 		n, err := stream.Read(buff)
-		if err == io.EOF || n == 0 {
-			break
-		}
-		if err != nil {
+    fmt.Printf("n: %d\nerr: %v\n", n, err)
+		if err != nil && err != io.EOF {
 			return err
 		}
 
 		if _, err := bw.Write(buff[:n]); err != nil {
 			return err
 		}
+
+    if err == io.EOF || n == 0 {
+			break
+		}
 	}
 
-	if err = bw.Flush(); err != nil {
-		return err
-	}
+	defer bw.Flush()
 	log.Println("DONE")
 	return nil
 }
 
 // Setup a bare-bones TLS config for the server
 func generateTLSConfig() *tls.Config {
-	key, err := rsa.GenerateKey(rand.Reader, buffSize)
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
 		panic(err)
 	}
