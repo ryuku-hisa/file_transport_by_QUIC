@@ -17,64 +17,60 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
-const addr = "192.168.15.35:50051"
+const addr = "localhost:50051"
 const buffSize = 1024
 const fname = "./download/data.txt"
 
 func main() {
 	fmt.Println("start server...")
-	err := server()
-	if err != nil {
-		log.Fatal(err)
-	}
+	server()
 }
 
 func server() error {
 	listener, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
-
-	fp, err := os.Create(fname)
-	if err != nil {
-		return err
-	}
-	defer fp.Close()
-
-	bw := bufio.NewWriter(fp)
-
-	conn, err := listener.Accept(context.Background())
-	if err != nil {
-		return err
-	}
-
-	stream, err := conn.AcceptUniStream(context.Background())
-	if err != nil {
-		return err
-	}
-	//defer stream.Close()
-
-	buff := make([]byte, buffSize)
-
 	for {
-		n, err := stream.Read(buff)
-    fmt.Printf("n: %d\nerr: %v\n", n, err)
-		if err != nil && err != io.EOF {
-			return err
+		fp, err := os.Create(fname)
+		if err != nil {
+			log.Fatal(err)
 		}
+		defer fp.Close()
 
-		if _, err := bw.Write(buff[:n]); err != nil {
-			return err
+		conn, err := listener.Accept(context.Background())
+		log.Println("Listener accept")
+		if err != nil {
+			log.Fatal(err)
 		}
+		defer listener.Close()
 
-    if err == io.EOF || n == 0 {
-			break
-		}
+		bw := bufio.NewWriter(fp)
+		go receive_handler(bw, conn)
 	}
 
-	defer bw.Flush()
-	log.Println("DONE")
-	return nil
+}
+
+func receive_handler(bw *bufio.Writer, conn quic.Connection) {
+
+	stream, err := conn.AcceptStream(context.Background())
+	log.Println("Accept Stream")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer func() {
+		log.Println("Stream Closed")
+		stream.Close()
+	}()
+
+	log.Println("Start Copying... ")
+	_, err = io.Copy(bw, stream)
+	log.Println("Copying DONE")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }
 
 // Setup a bare-bones TLS config for the server

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -37,28 +37,19 @@ func client(fname string) error {
 
 	conn, err := quic.DialAddr(addr, tlsConf, nil)
 
-	stream, err := conn.OpenStreamSync(context.Background())
+	// stream, err := conn.OpenStreamSync(context.Background())
+	stream, err := conn.OpenStream()
 	defer stream.Close()
 
-	buff := make([]byte, 1024)
-
 	for {
-
-		n, err := fp.Read(buff)
+		n, err := io.Copy(stream, fp)
+		fmt.Printf("n is %d\n", n)
+		if err != nil {
+			return err
+		}
 		if n == 0 {
-			fmt.Println("fin reading")
 			break
 		}
-		if err != nil {
-			return err
-		}
-
-		_, err = stream.Write(buff[:n])
-		if err != nil {
-			return err
-		}
 	}
-	log.Println("DONE")
-
 	return nil
 }
