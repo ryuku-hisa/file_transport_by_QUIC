@@ -23,10 +23,10 @@ const fname = "./download/data.txt"
 
 func main() {
 	fmt.Println("start server...")
-	server()
+	receiver()
 }
 
-func server() error {
+func receiver() error {
 	listener, err := quic.ListenAddr(addr, generateTLSConfig(), nil)
 	if err != nil {
 		log.Fatal(err)

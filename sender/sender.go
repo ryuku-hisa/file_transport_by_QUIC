@@ -17,13 +17,13 @@ func main() {
 		log.Fatal("invalid argument")
 	}
 	fname := os.Args[1]
-	err := client(fname)
+	err := sender(fname)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func client(fname string) error {
+func sender(fname string) error {
 	fp, err := os.Open(fname)
 	if err != nil {
 		panic(err)
